@@ -6,6 +6,8 @@ set -e
 # Configuration
 TARGET_USER="${TARGET_USER:-steffai}"
 
+TARGET_LANG="C.UTF-8"
+
 GIT_NAME="$(git config user.name)"
 GIT_EMAIL="$(git config user.email)"
 
@@ -24,7 +26,7 @@ SOCKET_PATH="$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
 
 args=("$@")
 if [ ${#args[@]} -eq 0 ]; then
-    args=("bash")
+    args=("bash" "--login")
 elif [ "${args[0]}" = "opencode" ]; then
     HOME=$(eval echo "~${TARGET_USER}")
     args[0]="${HOME}/.opencode/bin/opencode"
@@ -47,6 +49,6 @@ setfacl -m u:"$TARGET_USER":r  "$XAUTHORITY"
 echo "Launching environment for OpenCode as user '$TARGET_USER'"
 sudo -u "$TARGET_USER" \
     "${TARGET_ENV[@]}" \
-    LANG="en_150.UTF-8" \
+    LANG="${TARGET_LANG}" \
     ssh-agent \
     "${args[@]}"
