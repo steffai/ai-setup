@@ -107,8 +107,8 @@ launch() {
 
 register_instance
 trap cleanup EXIT
-setup_xauthority
 collect_env
+setup_xauthority
 resolve_args
 grant_acls
 launch
