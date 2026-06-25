@@ -11,8 +11,15 @@ TARGET_LANG="C.UTF-8"
 GIT_NAME="$(git config user.name)"
 GIT_EMAIL="$(git config user.email)"
 
+XAUTHORITY_SOURCE=$(mktemp -t xauth-${USER}.XXXXXXXXXX)
+xauth extract "${XAUTHORITY_SOURCE}" "$DISPLAY"
+
 # Check environment variables
-KEEP_VARS="DISPLAY GIT_NAME GIT_EMAIL WAYLAND_DISPLAY XAUTHORITY XDG_RUNTIME_DIR"
+KEEP_VARS="DISPLAY GIT_NAME GIT_EMAIL WAYLAND_DISPLAY"
+# XDG_RUNTIME_DIR
+#   set: wl-copy: works, podman: fails
+#   unset: wl-copy: fails, podman: works
+#   however, xclip is used instead.
 TARGET_ENV=()
 for i in ${KEEP_VARS}; do
     if [ ! -v "${i}" ]; then
@@ -35,20 +42,26 @@ fi
 # Define cleanup function to revoke permissions on exit
 cleanup() {
     echo "Cleaning up Wayland ACL permissions..."
-    setfacl -m u:"$TARGET_USER" "$XAUTHORITY" 2>/dev/null || true
+    # setfacl -m u:"$TARGET_USER" "$XAUTHORITY" 2>/dev/null || true
+    rm -f "${XAUTHORITY_SOURCE}" 2>/dev/null || true
     setfacl -x u:"$TARGET_USER" "$SOCKET_PATH" 2>/dev/null || true
     setfacl -x u:"$TARGET_USER" "$XDG_RUNTIME_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
 
 # Grant explicit access ONLY to the target user using ACLs
-setfacl -m u:"$TARGET_USER":x  "$XDG_RUNTIME_DIR"
-setfacl -m u:"$TARGET_USER":rw "$SOCKET_PATH"
-setfacl -m u:"$TARGET_USER":r  "$XAUTHORITY"
+setfacl -m u:"$TARGET_USER":x  "${XDG_RUNTIME_DIR}"
+setfacl -m u:"$TARGET_USER":rw "${SOCKET_PATH}"
+setfacl -m u:"$TARGET_USER":r  "${XAUTHORITY_SOURCE}"
 
 echo "Launching environment for OpenCode as user '$TARGET_USER'"
 sudo -u "$TARGET_USER" \
     "${TARGET_ENV[@]}" \
+    SUDO_XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR}" \
+    XAUTHORITY="${XAUTHORITY_SOURCE}" \
     LANG="${TARGET_LANG}" \
     ssh-agent \
     "${args[@]}"
+
+# use follwing for wayland programs:
+# export XDG_RUNTIME_DIR="${SUDO_XDG_RUNTIME_DIR}"
